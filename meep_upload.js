@@ -26,27 +26,23 @@
     
     const token = await window.Clerk.session.getToken();
     
-    // Get presigned URL
     const batchResp = await fetch('https://fnf.higgsfield.ai/media/batch', {
       method: 'POST',
       headers: {'authorization': `Bearer ${token}`, 'content-type': 'application/json'},
       body: JSON.stringify({mimetypes: ['image/png'], source: 'user_upload', surface: 'seedance_2', force_ip_check: true})
     });
     const batchData = await batchResp.json();
-    const mediaId = batchData[0].id;
-    const presignedUrl = batchData[0].presigned_url;
+    const item = batchData[0];
+    const mediaId = item.id;
+    const uploadUrl = item.upload_url;   // correct field name
+    const contentType = item.content_type || 'image/png';
     
-    // Debug: store URL domain only
-    const urlParts = presignedUrl.match(/^(https?:\/\/[^\/]+)/);
-    window._urlDomain = urlParts ? urlParts[1] : 'unknown';
-    window._batchStatus = batchResp.status;
-    
-    // PUT without content-type (S3 presigned URLs are strict about headers)
-    const putResp = await fetch(presignedUrl, {
+    // PUT to upload URL
+    const putResp = await fetch(uploadUrl, {
       method: 'PUT',
-      body: blob
+      body: blob,
+      headers: {'Content-Type': contentType}
     });
-    
     const putBody = await putResp.text();
     
     // Finalize
@@ -59,14 +55,12 @@
     
     window._uploadResult = {
       mediaId: mediaId,
-      urlDomain: window._urlDomain,
       putStatus: putResp.status,
-      putBodyLen: putBody.length,
       finalStatus: finalResp.status,
       finalOk: finalResp.ok,
-      finalDetail: finalData.detail || finalData.id || JSON.stringify(finalData).substring(0,100)
+      detail: finalData.detail || finalData.id || JSON.stringify(finalData).substring(0,150)
     };
   } catch(e) {
-    window._uploadResult = {error: e.message};
+    window._uploadResult = {error: e.message, stack: e.stack ? e.stack.substring(0,200) : null};
   }
 })();
